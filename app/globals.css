@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #f8f9fa;
+  color: #3d4b5c;
+}
+
+/* Custom scrollbar for a more polished feel */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #e8ecef;
+  border-radius: 10px;
+}
+
+/* Utility layer additions matching the original design system */
+@layer components {
+  .btn-primary {
+    @apply bg-green text-white font-semibold rounded-sm2 px-7 py-3.5 flex items-center justify-center gap-2 w-full transition-all hover:bg-green-dark hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(29,185,84,0.3)];
+  }
+  .btn-secondary {
+    @apply bg-transparent text-green border-2 border-green rounded-sm2 px-6 py-3 font-semibold flex items-center gap-2 transition-all hover:bg-green-light;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-greyMid px-5 py-3 rounded-sm2 text-sm font-medium border-[1.5px] border-greyLight transition-all hover:border-green hover:text-green;
+  }
+  .form-label {
+    @apply text-[13px] font-semibold text-greyDark;
+  }
+  .form-input {
+    @apply border-[1.5px] border-greyLight rounded-sm2 px-4 py-3 text-[15px] text-greyDark bg-white w-full transition-all focus:border-green focus:shadow-[0_0_0_3px_rgba(29,185,84,0.1)] outline-none;
+  }
+  .form-select {
+    @apply border-[1.5px] border-greyLight rounded-sm2 px-4 py-3 text-[15px] text-greyDark bg-white w-full transition-all focus:border-green outline-none appearance-none cursor-pointer;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+  .badge-green {
+    @apply bg-green-light text-[#0d7a3c];
+  }
+  .badge-orange {
+    @apply bg-[#fff3ed] text-[#c94a14];
+  }
+  .badge-red {
+    @apply bg-[#ffe8ea] text-[#c0202f];
+  }
+  .card {
+    @apply bg-white rounded-card shadow-card;
+  }
+}
