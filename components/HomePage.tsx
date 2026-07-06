@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   ArrowLeftRight,
@@ -12,15 +12,29 @@ import {
   Building2,
 } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
-import { CITIES } from "@/lib/trips";
+import { fetchCities, fetchAgencies } from "@/lib/firebase/firestore";
 
 export default function HomePage() {
-  const { search, showToast } = useApp();
+  const { search, showToast, firebaseReady } = useApp();
   const [depart, setDepart] = useState("");
   const [arrivee, setArrivee] = useState("");
   const [date, setDate] = useState("");
+  const [cities, setCities] = useState<string[]>([]);
+  const [agencies, setAgencies] = useState<string[]>([]);
+  const [stats, setStats] = useState({ travelers: "---", agenciesCount: "---", lines: "---" });
 
-  const destinations = CITIES.filter((c) => c !== depart);
+  useEffect(() => {
+    if (!firebaseReady) return;
+    fetchCities().then(setCities).catch(() => {});
+    fetchAgencies()
+      .then((list) => {
+        setAgencies(list.map((a: any) => a.name || "").filter(Boolean));
+        setStats((s) => ({ ...s, agenciesCount: String(list.length) }));
+      })
+      .catch(() => {});
+  }, [firebaseReady]);
+
+  const destinations = cities.filter((c) => c !== depart);
 
   function swap() {
     const d = depart;
@@ -67,15 +81,15 @@ export default function HomePage() {
             </p>
             <div className="flex gap-8">
               <div>
-                <div className="text-[28px] font-extrabold text-green">500+</div>
+                <div className="text-[28px] font-extrabold text-green">{stats.travelers}</div>
                 <div className="text-[13px] text-white/60">Voyageurs satisfaits</div>
               </div>
               <div>
-                <div className="text-[28px] font-extrabold text-green">5</div>
+                <div className="text-[28px] font-extrabold text-green">{stats.agenciesCount}</div>
                 <div className="text-[13px] text-white/60">Agences partenaires</div>
               </div>
               <div>
-                <div className="text-[28px] font-extrabold text-green">3</div>
+                <div className="text-[28px] font-extrabold text-green">{stats.lines}</div>
                 <div className="text-[13px] text-white/60">Lignes actives</div>
               </div>
             </div>
@@ -98,7 +112,7 @@ export default function HomePage() {
                     onChange={(e) => setDepart(e.target.value)}
                   >
                     <option value="">Choisir une ville</option>
-                    {CITIES.map((c) => (
+                    {cities.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -156,20 +170,27 @@ export default function HomePage() {
             <Flame size={16} className="text-orange" /> Lignes populaires
           </div>
           <div className="flex gap-3 flex-wrap">
-            {[
-              ["Douala", "Yaoundé", "5 000 F"],
-              ["Douala", "Bafoussam", "4 500 F"],
-              ["Douala", "Kribi", "3 000 F"],
-              ["Yaoundé", "Douala", "5 000 F"],
-            ].map(([dep, arr, price]) => (
-              <div
-                key={dep + arr}
-                className="flex items-center gap-2 px-4.5 py-2.5 bg-bg border-[1.5px] border-greyLight rounded-full text-sm text-greyDark cursor-pointer font-medium transition-all hover:border-green hover:text-green hover:bg-green-light"
-                onClick={() => quickSearch(dep, arr)}
-              >
-                🚌 {dep} → {arr} <span className="text-green font-bold">dès {price}</span>
-              </div>
-            ))}
+            {cities.length >= 2 ? (
+              (() => {
+                const pairs: [string, string][] = [];
+                for (let i = 0; i < cities.length; i++) {
+                  for (let j = i + 1; j < cities.length; j++) {
+                    pairs.push([cities[i], cities[j]]);
+                  }
+                }
+                return pairs.slice(0, 4).map(([dep, arr]) => (
+                  <div
+                    key={dep + arr}
+                    className="flex items-center gap-2 px-4.5 py-2.5 bg-bg border-[1.5px] border-greyLight rounded-full text-sm text-greyDark cursor-pointer font-medium transition-all hover:border-green hover:text-green hover:bg-green-light"
+                    onClick={() => quickSearch(dep, arr)}
+                  >
+                    🚌 {dep} → {arr}
+                  </div>
+                ));
+              })()
+            ) : (
+              <span className="text-sm text-greyMid">Chargement...</span>
+            )}
           </div>
         </div>
       </div>
@@ -227,17 +248,11 @@ export default function HomePage() {
               Nos agences partenaires
             </div>
             <p className="text-base text-greyMid">
-              5 agences vérifiées et de confiance
+              {agencies.length} agences vérifiées et de confiance
             </p>
           </div>
           <div className="flex gap-5 flex-wrap items-center justify-center">
-            {[
-              "Général Express",
-              "Buca Voyages",
-              "Vatican Express",
-              "Tonton Express",
-              "Cerise Express",
-            ].map((name) => (
+            {agencies.length > 0 ? agencies.map((name) => (
               <div
                 key={name}
                 className="bg-bg border-[1.5px] border-greyLight rounded-sm2 px-6 py-4 text-sm font-bold text-navy flex items-center gap-2.5"
@@ -245,7 +260,9 @@ export default function HomePage() {
                 <Building2 size={16} className="text-green" />
                 {name}
               </div>
-            ))}
+            )) : (
+              <span className="text-sm text-greyMid">Chargement...</span>
+            )}
           </div>
         </div>
       </section>
@@ -254,9 +271,9 @@ export default function HomePage() {
       <div className="bg-gradient-to-br from-navy to-[#1a2f55] py-16 px-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-[900px] mx-auto text-center">
           {[
-            ["500+", "Voyageurs satisfaits"],
+            [stats.travelers, "Voyageurs satisfaits"],
             ["98%", "Taux de satisfaction"],
-            ["3", "Lignes actives"],
+            [stats.lines, "Lignes actives"],
             ["< 5 min", "Pour réserver"],
           ].map(([num, label]) => (
             <div key={label}>

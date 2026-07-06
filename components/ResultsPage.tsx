@@ -9,6 +9,7 @@ const AMENITY_ICON: Record<string, JSX.Element> = {
   "❄️": <Snowflake size={16} />,
   "🧳": <Luggage size={16} />,
   "🔌": <Usb size={16} />,
+  "🍽️": <span className="text-sm">🍽️</span>,
 };
 
 function TripCard({ trip }: { trip: Trip }) {
@@ -117,7 +118,7 @@ function TripCard({ trip }: { trip: Trip }) {
 }
 
 export default function ResultsPage() {
-  const { searchResults, goTo } = useApp();
+  const { searchResults, searchLoading, goTo } = useApp();
   const routeLabel =
     searchResults.length > 0
       ? `${searchResults[0].depart} → ${searchResults[0].arrive}`
@@ -223,9 +224,15 @@ export default function ResultsPage() {
             </select>
           </div>
           <div>
-            {searchResults.map((t) => (
-              <TripCard key={t.id} trip={t} />
-            ))}
+            {searchLoading ? (
+              <div className="text-center py-10 text-sm text-greyMid">Recherche en cours...</div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center py-10 text-sm text-greyMid">Aucun trajet trouvé pour cette route.</div>
+            ) : (
+              searchResults.map((t) => (
+                <TripCard key={t.id} trip={t} />
+              ))
+            )}
           </div>
         </div>
       </div>

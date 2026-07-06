@@ -11,9 +11,8 @@ import {
 } from "react";
 import { User } from "firebase/auth";
 import { PageKey, PaymentMethod, Trip, BookingInfo } from "./types";
-import { TRIPS } from "./trips";
 import { isFirebaseConfigured } from "./firebase/config";
-import { fetchTrips, createBooking, fetchTripById } from "./firebase/firestore";
+import { fetchTrips, createBooking, fetchTripById, fetchAgencyByEmail } from "./firebase/firestore";
 import { onAuthChange, signOut as fbSignOut } from "./firebase/auth";
 
 interface AppContextValue {
@@ -22,6 +21,7 @@ interface AppContextValue {
   trips: Trip[];
   searchResults: Trip[];
   search: (depart: string, arrive: string) => void;
+  searchLoading: boolean;
   currentTrip: Trip;
   openTrip: (id: string) => void;
   qty: number;
@@ -44,15 +44,35 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-let allTripsCache: Trip[] = TRIPS;
+let allTripsCache: Trip[] = [];
 let firebaseLoaded = false;
+
+const EMPTY_TRIP: Trip = {
+  id: "",
+  agency: "",
+  code: "",
+  color: "#1DB954",
+  depH: "",
+  arrH: "",
+  dur: "",
+  depart: "",
+  arrive: "",
+  depStop: "",
+  arrStop: "",
+  price: 0,
+  seats: 0,
+  total: 0,
+  rating: 0,
+  reviews: 0,
+  status: "open",
+  amenities: [],
+};
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [page, setPage] = useState<PageKey>("home");
-  const [searchResults, setSearchResults] = useState<Trip[]>(
-    TRIPS.filter((t) => t.depart === "Douala" && t.arrive === "Yaoundé")
-  );
-  const [currentTrip, setCurrentTrip] = useState<Trip>(TRIPS[0]);
+  const [searchResults, setSearchResults] = useState<Trip[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [currentTrip, setCurrentTrip] = useState<Trip>(EMPTY_TRIP);
   const [qty, setQty] = useState(1);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("orange");
   const [booking, setBooking] = useState<BookingInfo>({
@@ -81,22 +101,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       firebaseLoaded = true;
       fetchTrips()
         .then((fbTrips) => {
+          allTripsCache = fbTrips;
           if (fbTrips.length > 0) {
-            allTripsCache = fbTrips;
-            setSearchResults(
-              fbTrips.filter((t) => t.depart === "Douala" && t.arrive === "Yaoundé")
-            );
             setCurrentTrip(fbTrips[0]);
           }
         })
         .catch(() => {});
     }
 
-    const unsub = onAuthChange((fbUser) => {
+    const unsub = onAuthChange(async (fbUser) => {
       setUser(fbUser);
       if (fbUser) {
         const email = fbUser.email || "";
-        setIsAgency(!email.endsWith("@t.e-travel.cm"));
+        if (email.endsWith("@t.e-travel.cm")) {
+          const agency = await fetchAgencyByEmail(email).catch(() => null);
+          setIsAgency(!!agency);
+        } else {
+          setIsAgency(false);
+        }
       } else {
         setIsAgency(false);
       }
@@ -111,23 +133,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const search = useCallback(async (depart: string, arrive: string) => {
+    setSearchLoading(true);
     if (firebaseReady) {
       try {
         const fbResults = await fetchTrips({ depart, arrive });
-        if (fbResults.length > 0) {
-          setSearchResults(fbResults);
-          setPage("results");
-          if (typeof window !== "undefined") window.scrollTo(0, 0);
-          return;
-        }
-      } catch {}
+        setSearchResults(fbResults);
+        setPage("results");
+        if (typeof window !== "undefined") window.scrollTo(0, 0);
+        setSearchLoading(false);
+        return;
+      } catch (e) {
+        console.error("Erreur recherche Firebase:", e);
+      }
     }
     const filtered = allTripsCache.filter(
       (t) => t.depart === depart && t.arrive === arrive
     );
-    setSearchResults(filtered.length > 0 ? filtered : allTripsCache);
+    setSearchResults(filtered);
     setPage("results");
     if (typeof window !== "undefined") window.scrollTo(0, 0);
+    setSearchLoading(false);
   }, [firebaseReady]);
 
   const openTrip = useCallback(async (id: string) => {
@@ -141,13 +166,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (typeof window !== "undefined") window.scrollTo(0, 0);
           return;
         }
-      } catch {}
+      } catch (e) {
+        console.error("Erreur chargement trajet Firebase:", e);
+      }
     }
-    const t = allTripsCache.find((tr) => tr.id === id) || allTripsCache[0];
-    setCurrentTrip(t);
-    setQty(1);
-    setPage("detail");
-    if (typeof window !== "undefined") window.scrollTo(0, 0);
+    const t = allTripsCache.find((tr) => tr.id === id);
+    if (t) {
+      setCurrentTrip(t);
+      setQty(1);
+      setPage("detail");
+      if (typeof window !== "undefined") window.scrollTo(0, 0);
+    }
   }, [firebaseReady]);
 
   const changeQty = useCallback(
@@ -159,12 +188,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const confirmBooking = useCallback(
     async (info: Omit<BookingInfo, "ref">) => {
-      const ref = "ET-" + Date.now().toString().slice(-8);
-      setBooking({ ...info, ref });
+      setPage("confirm");
 
       if (firebaseReady && currentTrip.id) {
         try {
-          await createBooking({
+          const result = await createBooking({
             tripId: currentTrip.id,
             agencyId: currentTrip.agencyId || "",
             prenom: info.prenom,
@@ -174,10 +202,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             totalAmount: currentTrip.price * qty + Math.round(currentTrip.price * qty * 0.05),
             paymentMethod: selectedPayment,
           });
-        } catch {}
+          if (result) {
+            setBooking({ ...info, ref: result.ref });
+          } else {
+            const ref = "ET-" + Date.now().toString().slice(-8);
+            setBooking({ ...info, ref });
+          }
+        } catch (e) {
+          console.error("Firestore createBooking a échoué:", e);
+          const ref = "ET-" + Date.now().toString().slice(-8);
+          setBooking({ ...info, ref });
+        }
+      } else {
+        const ref = "ET-" + Date.now().toString().slice(-8);
+        setBooking({ ...info, ref });
       }
-
-      setPage("confirm");
       if (typeof window !== "undefined") window.scrollTo(0, 0);
     },
     [firebaseReady, currentTrip, qty, selectedPayment]
@@ -208,6 +247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trips: allTripsCache,
       searchResults,
       search,
+      searchLoading,
       currentTrip,
       openTrip,
       qty,
@@ -228,7 +268,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logout,
     }),
     [
-      page, goTo, searchResults, search, currentTrip, openTrip,
+      page, goTo, searchResults, search, searchLoading, currentTrip, openTrip,
       qty, changeQty, selectedPayment, booking, confirmBooking,
       toast, showToast, addTripModalOpen, loginModalOpen,
       firebaseReady, user, isAgency, logout,

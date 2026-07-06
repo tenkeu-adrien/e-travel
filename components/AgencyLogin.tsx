@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef } from "react";
-import { Bus } from "lucide-react";
+import { useState, useRef } from "react";
+import { Bus, Loader2 } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
 import { signInAsAgency } from "@/lib/firebase/auth";
 
 export default function AgencyLogin() {
   const { goTo, showToast, firebaseReady } = useApp();
+  const [loading, setLoading] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const passRef = useRef<HTMLInputElement>(null);
 
@@ -23,15 +24,18 @@ export default function AgencyLogin() {
       return;
     }
 
+    setLoading(true);
     if (firebaseReady) {
       try {
         await signInAsAgency(email, password);
       } catch (err: any) {
         showToast("⚠️ " + (err.code === "auth/invalid-credential" ? "Identifiants incorrects" : "Erreur de connexion"));
+        setLoading(false);
         return;
       }
     }
 
+    setLoading(false);
     goTo("agency");
   }
 
@@ -68,8 +72,8 @@ export default function AgencyLogin() {
               defaultValue="password123"
             />
           </div>
-          <button className="btn-primary" onClick={handleLogin}>
-            Se connecter →
+          <button className="btn-primary" onClick={handleLogin} disabled={loading}>
+            {loading ? <><Loader2 size={16} className="animate-spin inline" /> Connexion...</> : "Se connecter →"}
           </button>
           <div className="text-center text-[13px] text-greyMid">
             <a href="#" className="text-green">

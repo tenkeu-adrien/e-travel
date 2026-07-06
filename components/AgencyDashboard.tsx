@@ -13,16 +13,26 @@ import {
   Plus,
 } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
-import { fetchTrips, fetchBookingsByAgency, fetchAgencyByEmail } from "@/lib/firebase/firestore";
+import {
+  fetchTrips,
+  fetchBookingsByAgency,
+  fetchAgencyByEmail,
+  fetchAgencyDashboardStats,
+  updateTrip,
+  AgencyStats,
+} from "@/lib/firebase/firestore";
 import { Trip } from "@/lib/types";
+import { fmt } from "@/lib/trips";
 
 export default function AgencyDashboard() {
   const { goTo, showToast, setAddTripModalOpen, logout, firebaseReady, user } = useApp();
   const [todayTrips, setTodayTrips] = useState<Trip[]>([]);
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [agencyId, setAgencyId] = useState<string>("");
-  const [agencyName, setAgencyName] = useState("Général Express");
+  const [agencyId, setAgencyId] = useState("");
+  const [agencyName, setAgencyName] = useState("");
+  const [isPremium, setIsPremium] = useState(false);
+  const [stats, setStats] = useState<AgencyStats | null>(null);
 
   useEffect(() => {
     if (!firebaseReady) {
@@ -34,56 +44,50 @@ export default function AgencyDashboard() {
     setLoading(true);
 
     async function load() {
-      let id = email.split("@")[0] || "unknown";
-      let name = email.split("@")[0] || "Mon Agence";
+      let id = "";
+      let name = "";
 
       if (email) {
         const agency = await fetchAgencyByEmail(email);
         if (agency) {
           id = agency.id as string;
           name = (agency as any).name || id;
+          setIsPremium(!!(agency as any).isPremium);
         }
       }
 
       setAgencyId(id);
       setAgencyName(name);
 
-      const [trips, bookings] = await Promise.all([
+      const [trips, bookings, dashboardStats] = await Promise.all([
         fetchTrips({ agencyId: id }).catch(() => [] as Trip[]),
         fetchBookingsByAgency(id).catch(() => []),
+        fetchAgencyDashboardStats(id).catch(() => null),
       ]);
 
       setTodayTrips(trips.slice(0, 4));
       setRecentBookings(bookings.slice(0, 4));
+      if (dashboardStats) setStats(dashboardStats);
       setLoading(false);
     }
 
     load();
   }, [firebaseReady, user]);
 
-  const today = todayTrips.length > 0 ? todayTrips : [
-    { time: "07:00", route: "Douala → Yaoundé", sub: "Gare Centrale → Gare Centrale", filled: 32, total: 32, status: "full" as const },
-    { time: "11:00", route: "Douala → Yaoundé", sub: "Gare Centrale → Gare Centrale", filled: 18, total: 32, status: "almost" as const },
-    { time: "14:30", route: "Douala → Yaoundé", sub: "Gare Centrale → Gare Centrale", filled: 8, total: 32, status: "ok" as const },
-    { time: "17:00", route: "Douala → Bafoussam", sub: "Gare Centrale → Gare Routière", filled: 29, total: 32, status: "almost" as const },
-  ] as any[];
-
-  const bookings = recentBookings.length > 0 ? recentBookings : [
-    { initials: "NK", name: "NKENG Paul", detail: "07:00 · Douala → Yaoundé", time: "Il y a 3 min" },
-    { initials: "BC", name: "BIYA Céline", detail: "07:00 · Douala → Yaoundé", time: "Il y a 12 min" },
-    { initials: "FM", name: "FOUDA Mathieu", detail: "11:00 · Douala → Yaoundé", time: "Il y a 25 min" },
-    { initials: "KA", name: "KAMDEM Alice", detail: "17:00 · Douala → Bafoussam", time: "Il y a 38 min" },
-  ];
+  const trips = todayTrips;
+  const bookings = recentBookings;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] min-h-[calc(100vh-4rem)]">
       <div className="hidden lg:block bg-navy py-6">
         <div className="px-5 pb-6 border-b border-white/10 mb-3">
-          <div className="text-white text-base font-bold">{agencyName}</div>
+          <div className="text-white text-base font-bold">{agencyName || "Mon Agence"}</div>
           <div className="text-white/50 text-xs mt-0.5">Tableau de bord agence</div>
-          <div className="inline-block bg-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5">
-            PREMIUM ★
-          </div>
+          {isPremium && (
+            <div className="inline-block bg-green text-white text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5">
+              PREMIUM ★
+            </div>
+          )}
         </div>
         <ul>
           <SidebarLink icon={<Home size={16} />} label="Dashboard" active />
@@ -108,7 +112,7 @@ export default function AgencyDashboard() {
         <div className="flex items-center justify-between mb-7 flex-wrap gap-3">
           <div>
             <div className="text-xl md:text-[22px] font-bold text-navy">
-              Bonjour, {agencyName} 👋
+              Bonjour, {agencyName || "Agence"} 👋
             </div>
             <div className="text-sm text-greyMid mt-0.5">
               {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} — Tableau de bord en temps réel
@@ -123,10 +127,10 @@ export default function AgencyDashboard() {
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-          <Kpi label="📋 Réservations aujourd'hui" value={loading ? "..." : String(bookings.length)} change="↑ en temps réel" />
-          <Kpi label="💺 Places vendues" value="24" sub="/ 96" change="75% de remplissage" />
-          <Kpi label="💰 Revenus du jour" value="120 000 F" change="↑ +12% vs hier" small />
-          <Kpi label="⭐ Note moyenne" value="4.2" change="★★★★☆ 128 avis" changeColor="text-yellow" />
+          <Kpi label="📋 Réservations" value={loading ? "..." : String(stats?.totalBookings ?? bookings.length)} change="Toutes les réservations" />
+          <Kpi label="💺 Places vendues" value={loading ? "..." : String(stats?.seatsSold ?? 0)} sub={stats ? `/ ${stats.totalSeats}` : undefined} change={stats && stats.totalSeats > 0 ? `${Math.round((stats.seatsSold / stats.totalSeats) * 100)}% de remplissage` : "---"} />
+          <Kpi label="💰 Revenus" value={loading ? "..." : stats ? `${fmt(stats.totalRevenue)} F` : "---"} change="Tous les revenus" small />
+          <Kpi label="⭐ Note moyenne" value={loading ? "..." : stats?.averageRating ? stats.averageRating.toFixed(1) : "---"} change={`${stats?.reviewsCount ?? 0} avis`} changeColor="text-yellow" />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
@@ -140,73 +144,73 @@ export default function AgencyDashboard() {
                 + Nouveau
               </button>
             </div>
-            {today.length === 0 && !loading && (
+            {trips.length === 0 && !loading && (
               <div className="px-6 py-8 text-center text-sm text-greyMid">
                 Aucun trajet pour le moment. Cliquez sur "+ Nouveau" pour en créer un.
               </div>
             )}
-            {today.map((trip: any, i: number) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 px-6 py-4 border-b border-greyLight last:border-b-0 hover:bg-bg transition-colors"
-              >
-                <div className="text-base font-bold text-navy min-w-[50px]">{trip.time || trip.depH}</div>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-greyDark">{trip.route || `${trip.depart} → ${trip.arrive}`}</div>
-                  <div className="text-xs text-greyMid">{trip.sub || `${trip.depStop} → ${trip.arrStop}`}</div>
-                </div>
-                <div className="min-w-[80px] text-right">
-                  <div className="text-[13px] font-bold text-navy">
-                    {trip.filled ?? (trip.total - (trip.seats || 0))}/{trip.total}
+            {trips.map((trip, i) => {
+              const filled = trip.total - trip.seats;
+              const fillPct = trip.total > 0 ? Math.min(100, (filled / trip.total) * 100) : 0;
+              return (
+                <div
+                  key={trip.id || i}
+                  className="flex items-center gap-4 px-6 py-4 border-b border-greyLight last:border-b-0 hover:bg-bg transition-colors"
+                >
+                  <div className="text-base font-bold text-navy min-w-[50px]">{trip.depH}</div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-greyDark">{trip.depart} → {trip.arrive}</div>
+                    <div className="text-xs text-greyMid">{trip.depStop} → {trip.arrStop}</div>
                   </div>
-                  <div className="h-1.5 bg-greyLight rounded-full mt-1">
-                    <div
-                      className={`h-full rounded-full ${
-                        trip.status === "full"
-                          ? "bg-red"
-                          : trip.status === "urgent" || trip.status === "almost"
-                          ? "bg-orange"
-                          : "bg-green"
+                  <div className="min-w-[80px] text-right">
+                    <div className="text-[13px] font-bold text-navy">{filled}/{trip.total}</div>
+                    <div className="h-1.5 bg-greyLight rounded-full mt-1">
+                      <div
+                        className={`h-full rounded-full ${
+                          trip.status === "full" ? "bg-red" : trip.status === "urgent" ? "bg-orange" : "bg-green"
+                        }`}
+                        style={{ width: `${fillPct}%` }}
+                      />
+                    </div>
+                    <span
+                      className={`badge mt-1 text-[11px] ${
+                        trip.status === "full" ? "badge-red" : trip.status === "urgent" ? "badge-orange" : "badge-green"
                       }`}
-                      style={{ width: `${Math.min(100, ((trip.filled ?? (trip.total - (trip.seats || 0))) / trip.total) * 100)}%` }}
-                    />
-                  </div>
-                  <span
-                    className={`badge mt-1 text-[11px] ${
-                      trip.status === "full"
-                        ? "badge-red"
-                        : trip.status === "urgent" || trip.status === "almost"
-                        ? "badge-orange"
-                        : "badge-green"
-                    }`}
-                  >
-                    {trip.status === "full"
-                      ? "COMPLET"
-                      : trip.status === "urgent" || trip.status === "almost"
-                      ? `⚠️ ${trip.seats || (trip.total - (trip.filled || 0))} restantes`
-                      : `🟢 ${Math.round(((trip.filled ?? (trip.total - (trip.seats || 0))) / trip.total) * 100)}%`}
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  {trip.status !== "full" && (
-                    <button
-                      className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[#ffe8ea] text-red hover:bg-red hover:text-white transition-all"
-                      onClick={() => showToast("🔴 Réservations clôturées")}
                     >
-                      Clôturer
+                      {trip.status === "full"
+                        ? "COMPLET"
+                        : trip.status === "urgent"
+                        ? `⚠️ ${trip.seats} restantes`
+                        : `🟢 ${Math.round(fillPct)}%`}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {trip.status !== "full" && (
+                      <button
+                        className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[#ffe8ea] text-red hover:bg-red hover:text-white transition-all"
+                        onClick={async () => {
+                          await updateTrip(trip.id, { status: "full" });
+                          showToast("🔴 Trajet clôturé");
+                          setTodayTrips((prev) =>
+                            prev.map((t) => (t.id === trip.id ? { ...t, status: "full" as const } : t))
+                          );
+                        }}
+                      >
+                        Clôturer
+                      </button>
+                    )}
+                    <button
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold bg-bg text-greyDark border border-greyLight ${
+                        trip.status === "full" ? "opacity-50" : ""
+                      }`}
+                      disabled={trip.status === "full"}
+                    >
+                      Modifier
                     </button>
-                  )}
-                  <button
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold bg-bg text-greyDark border border-greyLight ${
-                      trip.status === "full" ? "opacity-50" : ""
-                    }`}
-                    disabled={trip.status === "full"}
-                  >
-                    Modifier
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="card overflow-hidden">
@@ -222,13 +226,15 @@ export default function AgencyDashboard() {
             {bookings.map((b: any, i: number) => (
               <div key={i} className="flex items-center gap-3 px-6 py-3.5 border-b border-greyLight">
                 <div className="w-9 h-9 rounded-full bg-green-light text-green flex items-center justify-center text-sm font-bold shrink-0">
-                  {b.initials || ((b.nom?.[0] || "X") + (b.prenom?.[0] || "X"))}
+                  {(b.nom?.[0] || "X") + (b.prenom?.[0] || "X")}
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-navy">{b.name || `${b.nom} ${b.prenom}`}</div>
-                  <div className="text-xs text-greyMid">{b.detail || `Réf: ${b.ref || "N/A"}`}</div>
+                  <div className="text-sm font-semibold text-navy">{b.nom} {b.prenom}</div>
+                  <div className="text-xs text-greyMid">{b.ref ? `Réf: ${b.ref}` : ""}</div>
                 </div>
-                <div className="text-xs text-greyMid ml-auto whitespace-nowrap">{b.time || "À l'instant"}</div>
+                <div className="text-xs text-greyMid ml-auto whitespace-nowrap">
+                  {b.createdAt?.toDate ? b.createdAt.toDate().toLocaleTimeString("fr-FR") : ""}
+                </div>
               </div>
             ))}
             <div className="px-6 py-3.5 text-center">

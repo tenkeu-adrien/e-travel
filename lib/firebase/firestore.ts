@@ -55,6 +55,8 @@ export const Collections = {
   agencies: () => collection(db!, "agencies"),
   travelers: () => collection(db!, "travelers"),
   reviews: () => collection(db!, "reviews"),
+  cities: () => collection(db!, "cities"),
+  appSettings: () => collection(db!, "appSettings"),
 };
 
 // ─── TRIPS ────────────────────────────────────────────────────────────────────
@@ -125,7 +127,10 @@ export async function createBooking(data: {
   totalAmount: number;
   paymentMethod: string;
 }) {
-  if (!db) throw new Error("Firestore non disponible");
+  if (!db) {
+    console.warn("Firestore non disponible – la réservation ne sera pas persistée");
+    return null;
+  }
   const ref = "ET-" + Date.now().toString().slice(-8);
   const docRef = await addDoc(Collections.bookings(), {
     ref,
@@ -301,4 +306,79 @@ export async function createReview(data: {
     createdAt: serverTimestamp(),
   });
   return docRef.id;
+}
+
+// ─── CITIES ────────────────────────────────────────────────────────────────────
+
+export async function fetchCities(): Promise<string[]> {
+  if (!db) return [];
+  const snap = await getDocs(Collections.cities());
+  return snap.docs.map((d) => d.data().name || "").filter(Boolean);
+}
+
+// ─── APP SETTINGS ──────────────────────────────────────────────────────────────
+
+export async function fetchAppSettings(): Promise<Record<string, string>> {
+  if (!db) return {};
+  const snap = await getDocs(Collections.appSettings());
+  const settings: Record<string, string> = {};
+  snap.docs.forEach((d) => {
+    settings[d.id] = d.data().value || "";
+  });
+  return settings;
+}
+
+// ─── AGENCY UPDATE ─────────────────────────────────────────────────────────────
+
+export async function updateAgency(agencyId: string, data: Record<string, any>) {
+  if (!db) return;
+  const ref = doc(Collections.agencies(), agencyId);
+  await updateDoc(ref, data);
+}
+
+// ─── BOOKING DELETE ────────────────────────────────────────────────────────────
+
+export async function deleteBooking(bookingId: string) {
+  if (!db) return;
+  await deleteDoc(doc(Collections.bookings(), bookingId));
+}
+
+// ─── AGENCY DASHBOARD STATS ────────────────────────────────────────────────────
+
+export interface AgencyStats {
+  totalTrips: number;
+  totalBookings: number;
+  seatsSold: number;
+  totalSeats: number;
+  totalRevenue: number;
+  averageRating: number;
+  reviewsCount: number;
+}
+
+export async function fetchAgencyDashboardStats(agencyId: string): Promise<AgencyStats> {
+  const stats: AgencyStats = {
+    totalTrips: 0,
+    totalBookings: 0,
+    seatsSold: 0,
+    totalSeats: 0,
+    totalRevenue: 0,
+    averageRating: 0,
+    reviewsCount: 0,
+  };
+  if (!db || !agencyId) return stats;
+
+  const trips = await fetchTrips({ agencyId });
+  stats.totalTrips = trips.length;
+  stats.totalSeats = trips.reduce((sum, t) => sum + (t.total || 0), 0);
+  stats.seatsSold = trips.reduce((sum, t) => sum + (t.total - t.seats), 0);
+
+  const bookings = await fetchBookingsByAgency(agencyId);
+  stats.totalBookings = bookings.length;
+  stats.totalRevenue = bookings.reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
+
+  const avgRating = trips.reduce((sum, t) => sum + (t.rating || 0), 0);
+  stats.averageRating = trips.length > 0 ? avgRating / trips.length : 0;
+  stats.reviewsCount = trips.reduce((sum, t) => sum + (t.reviews || 0), 0);
+
+  return stats;
 }

@@ -19,6 +19,15 @@ export default function ConfirmPage() {
   const { currentTrip: t, qty, booking, goTo, showToast } = useApp();
   const total = t.price * qty + fees(t.price * qty);
 
+  const tripDate = t.date
+    ? new Date(t.date).toLocaleDateString("fr-FR", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "Date non renseignée";
+
   return (
     <div className="max-w-[720px] mx-auto px-6 py-10">
       <div className="text-center mb-10">
@@ -28,7 +37,7 @@ export default function ConfirmPage() {
         </h1>
         <p className="text-base text-greyMid">
           Votre billet a été envoyé sur WhatsApp au{" "}
-          <strong>+237 {booking.phone || "6XX XX XX XX"}</strong>
+          <strong>+237 {booking.phone}</strong>
         </p>
         <div className="inline-flex items-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-full text-sm font-bold mt-3">
           <MessageCircle size={16} /> Vérifiez votre WhatsApp maintenant
@@ -45,7 +54,7 @@ export default function ConfirmPage() {
               e-travel
             </div>
             <div className="text-[13px] text-white/60 font-mono">
-              Réf : {booking.ref || "ET-XXXXXXXX"}
+              Réf : {booking.ref}
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -70,8 +79,8 @@ export default function ConfirmPage() {
 
         <div className="px-7 py-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 mb-6">
-            <TicketInfo label="Passager" value={`${booking.nom.toUpperCase() || "SALAKO"} ${booking.prenom || "Antony"}`} />
-            <TicketInfo label="Date" value="Lun 15 Juin 2026" />
+            <TicketInfo label="Passager" value={`${booking.nom.toUpperCase()} ${booking.prenom}`} />
+            <TicketInfo label="Date" value={tripDate} />
             <TicketInfo label="Agence" value={t.agency} />
             <TicketInfo label="Départ" value={`${t.depStop}, ${t.depart}`} />
             <TicketInfo label="Passagers" value={`${qty} passager${qty > 1 ? "s" : ""}`} />
@@ -145,10 +154,6 @@ export default function ConfirmPage() {
           <div className="flex items-start gap-2">
             <Luggage size={16} className="mt-0.5 shrink-0" />{" "}
             <strong>1 bagage en soute</strong> inclus (max 25 kg)
-          </div>
-          <div className="flex items-start gap-2">
-            <Phone size={16} className="mt-0.5 shrink-0" /> Support WhatsApp :{" "}
-            <strong>+237 XXX XXX XXX</strong>
           </div>
         </div>
       </div>

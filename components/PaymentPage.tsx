@@ -33,14 +33,17 @@ export default function PaymentPage() {
   const [nom, setNom] = useState("");
   const [phone, setPhone] = useState("");
   const [cgu, setCgu] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function pay() {
+  async function pay() {
     if (!prenom.trim()) return showToast("⚠️ Veuillez entrer votre prénom");
     if (!nom.trim()) return showToast("⚠️ Veuillez entrer votre nom");
     if (!phone.trim() || phone.trim().length < 8)
       return showToast("⚠️ Numéro WhatsApp invalide");
     if (!cgu) return showToast("⚠️ Veuillez accepter les CGU");
-    confirmBooking({ prenom, nom, phone });
+    setLoading(true);
+    await confirmBooking({ prenom, nom, phone });
+    setLoading(false);
   }
 
   return (
@@ -211,8 +214,12 @@ export default function PaymentPage() {
             </label>
           </div>
 
-          <button className="btn-primary text-[17px] py-4" onClick={pay}>
-            <Lock size={18} /> PAYER {fmt(total)} FCFA
+          <button className="btn-primary text-[17px] py-4" onClick={pay} disabled={loading}>
+            {loading ? (
+              "⏳ Paiement en cours..."
+            ) : (
+              <><Lock size={18} /> PAYER {fmt(total)} FCFA</>
+            )}
           </button>
         </div>
 
@@ -223,7 +230,7 @@ export default function PaymentPage() {
               <div className="text-base font-bold text-navy mb-1">
                 {t.depart} → {t.arrive}
               </div>
-              <div className="text-[13px] text-greyMid mb-1">📅 Lundi 15 Juin 2026 · {t.depH}</div>
+              <div className="text-[13px] text-greyMid mb-1">📅 {t.date ? new Date(t.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Date non renseignée"} · {t.depH}</div>
               <div className="text-[13px] text-greyDark font-semibold">🏢 {t.agency}</div>
             </div>
             <div className="bg-bg rounded-lg p-4 mb-4">

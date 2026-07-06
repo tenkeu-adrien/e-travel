@@ -1,13 +1,17 @@
 "use client";
 
-import { useRef } from "react";
-import { X, Bus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Bus, Loader2 } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
-import { CITIES } from "@/lib/trips";
-import { createTrip } from "@/lib/firebase/firestore";
+import { fetchCities, createTrip, fetchAgencyByEmail } from "@/lib/firebase/firestore";
 
 export default function AddTripModal() {
   const { addTripModalOpen, setAddTripModalOpen, showToast, firebaseReady, user } = useApp();
+  const [cities, setCities] = useState<string[]>([]);
+  const [agencyName, setAgencyName] = useState("");
+  const [agencyCode, setAgencyCode] = useState("");
+  const [agencyColor, setAgencyColor] = useState("#1DB954");
+  const [publishing, setPublishing] = useState(false);
 
   const departRef = useRef<HTMLSelectElement>(null);
   const arriveRef = useRef<HTMLSelectElement>(null);
@@ -20,6 +24,23 @@ export default function AddTripModal() {
   const acRef = useRef<HTMLInputElement>(null);
   const luggageRef = useRef<HTMLInputElement>(null);
   const usbRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!addTripModalOpen || !firebaseReady) return;
+    fetchCities().then(setCities).catch(() => {});
+
+    const email = user?.email || "";
+    if (email) {
+      fetchAgencyByEmail(email).then((agency) => {
+        if (agency) {
+          const a = agency as any;
+          setAgencyName(a.name || "");
+          setAgencyCode(a.code || "");
+          setAgencyColor(a.color || "#1DB954");
+        }
+      }).catch(() => {});
+    }
+  }, [addTripModalOpen, firebaseReady, user]);
 
   if (!addTripModalOpen) return null;
 
@@ -52,16 +73,17 @@ export default function AddTripModal() {
     if (usbRef.current?.checked) amenities.push("🔌");
 
     const agencyId = user?.uid || "unknown";
-    const agencyEmail = user?.email || "";
-    const agencyName = agencyEmail.split("@")[0] || "Mon Agence";
+    const name = agencyName || user?.email?.split("@")[0] || "Mon Agence";
+    const code = agencyCode || name.substring(0, 2).toUpperCase();
 
+    setPublishing(true);
     if (firebaseReady) {
       try {
         await createTrip({
-          agency: agencyName,
+          agency: name,
           agencyId,
-          code: agencyName.substring(0, 2).toUpperCase(),
-          color: "#1DB954",
+          code,
+          color: agencyColor,
           depH: time,
           arrH: "",
           dur: "",
@@ -80,10 +102,11 @@ export default function AddTripModal() {
         });
       } catch {
         showToast("⚠️ Erreur lors de la publication");
+        setPublishing(false);
         return;
       }
     }
-
+    setPublishing(false);
     close();
     showToast("✅ Trajet publié avec succès sur e-travel !");
   }
@@ -110,7 +133,7 @@ export default function AddTripModal() {
             <div className="flex flex-col gap-1.5">
               <label className="form-label">Ville de départ *</label>
               <select ref={departRef} className="form-select">
-                {CITIES.map((c) => (
+                {cities.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>
@@ -118,11 +141,9 @@ export default function AddTripModal() {
             <div className="flex flex-col gap-1.5">
               <label className="form-label">Ville d&apos;arrivée *</label>
               <select ref={arriveRef} className="form-select">
-                {CITIES.slice()
-                  .reverse()
-                  .map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
+                {cities.slice().reverse().map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -177,8 +198,8 @@ export default function AddTripModal() {
           <button className="btn-ghost" onClick={close}>
             Annuler
           </button>
-          <button className="bg-green text-white px-7 py-3 rounded-sm2 font-semibold hover:bg-green-dark transition-all" onClick={publish}>
-            ✅ Publier le trajet
+          <button className="bg-green text-white px-7 py-3 rounded-sm2 font-semibold hover:bg-green-dark transition-all disabled:opacity-60 disabled:cursor-not-allowed" onClick={publish} disabled={publishing}>
+            {publishing ? <><Loader2 size={16} className="animate-spin inline" /> Publication...</> : "✅ Publier le trajet"}
           </button>
         </div>
       </div>

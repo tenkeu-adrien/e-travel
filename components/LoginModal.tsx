@@ -1,20 +1,21 @@
 "use client";
 
-import { useRef } from "react";
-import { X, User } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, User, Loader2 } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
 import { signInWithPhone, signUpWithPhone } from "@/lib/firebase/auth";
 import { createTraveler } from "@/lib/firebase/firestore";
 
 export default function LoginModal() {
   const { loginModalOpen, setLoginModalOpen, showToast, firebaseReady } = useApp();
+  const [loading, setLoading] = useState(false);
   const phoneRef = useRef<HTMLInputElement>(null);
   const passRef = useRef<HTMLInputElement>(null);
 
   if (!loginModalOpen) return null;
 
   function close() {
-    setLoginModalOpen(false);
+    if (!loading) setLoginModalOpen(false);
   }
 
   async function handleLogin() {
@@ -30,6 +31,7 @@ export default function LoginModal() {
       return;
     }
 
+    setLoading(true);
     if (firebaseReady) {
       try {
         await signInWithPhone(phone, password);
@@ -40,15 +42,17 @@ export default function LoginModal() {
             await createTraveler({ phone, nom: "", prenom: "" });
           } catch (signUpErr: any) {
             showToast("⚠️ Erreur d'inscription : " + signUpErr.code);
+            setLoading(false);
             return;
           }
         } else {
           showToast("⚠️ Erreur de connexion");
+          setLoading(false);
           return;
         }
       }
     }
-
+    setLoading(false);
     close();
     showToast("✅ Connexion réussie !");
   }
@@ -100,10 +104,11 @@ export default function LoginModal() {
             Annuler
           </button>
           <button
-            className="bg-green text-white px-7 py-3 rounded-sm2 font-semibold hover:bg-green-dark transition-all"
+            className="bg-green text-white px-7 py-3 rounded-sm2 font-semibold hover:bg-green-dark transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             onClick={handleLogin}
+            disabled={loading}
           >
-            Se connecter
+            {loading ? <><Loader2 size={16} className="animate-spin inline" /> Connexion...</> : "Se connecter"}
           </button>
         </div>
       </div>
