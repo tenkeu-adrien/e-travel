@@ -39,6 +39,9 @@ interface AppContextValue {
   firebaseReady: boolean;
   user: User | null;
   isAgency: boolean;
+  agencyName: string;
+  isPremium: boolean;
+  refreshAgency: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -85,6 +88,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAgency, setIsAgency] = useState(false);
+  const [agencyName, setAgencyName] = useState("");
+  const [isPremium, setIsPremium] = useState(false);
   const [firebaseReady, setFirebaseReady] = useState(false);
   const [toast, setToast] = useState<{
     msg: string;
@@ -113,23 +118,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser(fbUser);
       if (fbUser) {
         const email = fbUser.email || "";
-        if (email.endsWith("@t.e-travel.cm")) {
-          const agency = await fetchAgencyByEmail(email).catch(() => null);
-          setIsAgency(!!agency);
+        const agency = await fetchAgencyByEmail(email).catch(() => null);
+        setIsAgency(!!agency);
+        if (agency) {
+          const a = agency as any;
+          setAgencyName(a.name || "");
+          setIsPremium(!!a.isPremium);
         } else {
-          setIsAgency(false);
+          setAgencyName("");
+          setIsPremium(false);
         }
       } else {
         setIsAgency(false);
+        setAgencyName("");
+        setIsPremium(false);
       }
     });
 
     return () => unsub();
   }, []);
 
+  const PAGE_HASH: Record<PageKey, string> = {
+    home: "#home",
+    results: "#results",
+    detail: "#detail",
+    payment: "#payment",
+    confirm: "#confirm",
+    agency: "#agency",
+    "agency-reservations": "#agency/reservations",
+    "agency-qr": "#agency/qr",
+    "agency-stats": "#agency/stats",
+    "agency-profile": "#agency/profile",
+    "agency-subscription": "#agency/subscription",
+    "agency-login": "#agency-login",
+    seed: "#seed",
+  };
+
+  const HASH_PAGE: Record<string, PageKey> = {};
+  for (const [k, v] of Object.entries(PAGE_HASH)) {
+    HASH_PAGE[v] = k as PageKey;
+  }
+
   const goTo = useCallback((p: PageKey) => {
     setPage(p);
-    if (typeof window !== "undefined") window.scrollTo(0, 0);
+    if (typeof window !== "undefined") {
+      const hash = PAGE_HASH[p];
+      if (hash && window.location.hash !== hash) {
+        window.history.pushState(null, "", hash);
+      }
+      window.scrollTo(0, 0);
+    }
+  }, []);
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    const onPop = () => {
+      const hash = window.location.hash || "#home";
+      const target = HASH_PAGE[hash] || "home";
+      setPage(target);
+    };
+    window.addEventListener("popstate", onPop);
+    // Sync initial hash
+    const initialHash = window.location.hash || "#home";
+    const initialPage = HASH_PAGE[initialHash] || "home";
+    if (initialPage !== page) {
+      setPage(initialPage);
+    }
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const search = useCallback(async (depart: string, arrive: string) => {
@@ -240,6 +295,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast("✅ Déconnexion réussie");
   }, [goTo, showToast]);
 
+  const refreshAgency = useCallback(async () => {
+    const email = user?.email;
+    if (!email) return;
+    const agency = await fetchAgencyByEmail(email).catch(() => null);
+    if (agency) {
+      const a = agency as any;
+      setAgencyName(a.name || "");
+      setIsPremium(!!a.isPremium);
+    }
+  }, [user]);
+
   const value = useMemo<AppContextValue>(
     () => ({
       page,
@@ -265,13 +331,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       firebaseReady,
       user,
       isAgency,
+      agencyName,
+      isPremium,
+      refreshAgency,
       logout,
     }),
     [
       page, goTo, searchResults, search, searchLoading, currentTrip, openTrip,
       qty, changeQty, selectedPayment, booking, confirmBooking,
       toast, showToast, addTripModalOpen, loginModalOpen,
-      firebaseReady, user, isAgency, logout,
+      firebaseReady, user, isAgency, agencyName, isPremium, refreshAgency, logout,
     ]
   );
 

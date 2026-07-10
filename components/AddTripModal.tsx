@@ -11,6 +11,7 @@ export default function AddTripModal() {
   const [agencyName, setAgencyName] = useState("");
   const [agencyCode, setAgencyCode] = useState("");
   const [agencyColor, setAgencyColor] = useState("#1DB954");
+  const [agencyDocId, setAgencyDocId] = useState("");
   const [publishing, setPublishing] = useState(false);
 
   const departRef = useRef<HTMLSelectElement>(null);
@@ -34,6 +35,7 @@ export default function AddTripModal() {
       fetchAgencyByEmail(email).then((agency) => {
         if (agency) {
           const a = agency as any;
+          setAgencyDocId(agency.id as string);
           setAgencyName(a.name || "");
           setAgencyCode(a.code || "");
           setAgencyColor(a.color || "#1DB954");
@@ -72,7 +74,7 @@ export default function AddTripModal() {
     if (luggageRef.current?.checked) amenities.push("🧳");
     if (usbRef.current?.checked) amenities.push("🔌");
 
-    const agencyId = user?.uid || "unknown";
+    const agencyId = agencyDocId || user?.uid || "unknown";
     const name = agencyName || user?.email?.split("@")[0] || "Mon Agence";
     const code = agencyCode || name.substring(0, 2).toUpperCase();
 

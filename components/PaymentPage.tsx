@@ -203,13 +203,13 @@ export default function PaymentPage() {
             />
             <label htmlFor="cgu" className="text-[13px] text-greyDark cursor-pointer leading-relaxed">
               J&apos;accepte les{" "}
-              <a href="#" className="text-green font-semibold">
+              <button className="text-green font-semibold cursor-pointer" onClick={() => showToast("📄 Conditions Générales d'Utilisation — Réservation soumise à nos CGU.")}>
                 CGU
-              </a>{" "}
+              </button>{" "}
               et la{" "}
-              <a href="#" className="text-green font-semibold">
+              <button className="text-green font-semibold cursor-pointer" onClick={() => showToast("🔄 Annulation possible jusqu'à 2h avant le départ. Remboursement à 80%.")}>
                 Politique d&apos;annulation
-              </a>{" "}
+              </button>{" "}
               de e-travel.
             </label>
           </div>

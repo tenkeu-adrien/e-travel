@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Pencil, Snowflake, Luggage, Usb } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
 import { fees, fmt } from "@/lib/trips";
@@ -119,6 +120,19 @@ function TripCard({ trip }: { trip: Trip }) {
 
 export default function ResultsPage() {
   const { searchResults, searchLoading, goTo } = useApp();
+  const [morning, setMorning] = useState(true);
+  const [afternoon, setAfternoon] = useState(true);
+  const [evening, setEvening] = useState(false);
+  const [sortBy, setSortBy] = useState("time");
+  const [filter5plus, setFilter5plus] = useState(false);
+  const [filterUrgent, setFilterUrgent] = useState(false);
+  const [filter5star, setFilter5star] = useState(false);
+  const [filter4plus, setFilter4plus] = useState(false);
+  const [filter3plus, setFilter3plus] = useState(false);
+  const [filterAc, setFilterAc] = useState(false);
+  const [filterLuggage, setFilterLuggage] = useState(false);
+  const [filterUsb, setFilterUsb] = useState(false);
+
   const routeLabel =
     searchResults.length > 0
       ? `${searchResults[0].depart} → ${searchResults[0].arrive}`
@@ -128,6 +142,34 @@ export default function ResultsPage() {
     day: "numeric",
     month: "long",
     year: "numeric",
+  });
+
+  function getHour(depH: string): number {
+    const [h] = depH.split(":").map(Number);
+    return h || 0;
+  }
+
+  const filtered = searchResults.filter((t) => {
+    const h = getHour(t.depH);
+    if (h >= 6 && h < 12 && !morning) return false;
+    if (h >= 12 && h < 18 && !afternoon) return false;
+    if (h >= 18 && h < 22 && !evening) return false;
+    if (filter5plus && t.seats < 5) return false;
+    if (filterUrgent && t.status !== "urgent") return false;
+    if (filter5star && t.rating < 5) return false;
+    if (filter4plus && t.rating < 4) return false;
+    if (filter3plus && t.rating < 3) return false;
+    if (filterAc && !t.amenities.includes("❄️")) return false;
+    if (filterLuggage && !t.amenities.includes("🧳")) return false;
+    if (filterUsb && !t.amenities.includes("🔌")) return false;
+    return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "price-asc") return a.price - b.price;
+    if (sortBy === "price-desc") return b.price - a.price;
+    if (sortBy === "rating") return b.rating - a.rating;
+    return getHour(a.depH) - getHour(b.depH);
   });
 
   return (
@@ -158,15 +200,15 @@ export default function ResultsPage() {
             <div className="text-[15px] font-bold text-navy mb-4">⏰ Horaire</div>
             <div className="flex flex-col gap-2.5 text-sm text-greyDark">
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" defaultChecked className="accent-green" /> Matin
+                <input type="checkbox" checked={morning} onChange={(e) => setMorning(e.target.checked)} className="accent-green" /> Matin
                 (6h-12h)
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" defaultChecked className="accent-green" /> Après-midi
+                <input type="checkbox" checked={afternoon} onChange={(e) => setAfternoon(e.target.checked)} className="accent-green" /> Après-midi
                 (12h-18h)
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> Soir (18h-22h)
+                <input type="checkbox" checked={evening} onChange={(e) => setEvening(e.target.checked)} className="accent-green" /> Soir (18h-22h)
               </label>
             </div>
           </div>
@@ -174,10 +216,10 @@ export default function ResultsPage() {
             <div className="text-[15px] font-bold text-navy mb-4">💺 Disponibilité</div>
             <div className="flex flex-col gap-2.5 text-sm text-greyDark">
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> Plus de 5 places
+                <input type="checkbox" className="accent-green" checked={filter5plus} onChange={(e) => setFilter5plus(e.target.checked)} /> Plus de 5 places
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> Dernières places
+                <input type="checkbox" className="accent-green" checked={filterUrgent} onChange={(e) => setFilterUrgent(e.target.checked)} /> Dernières places
               </label>
             </div>
           </div>
@@ -185,13 +227,13 @@ export default function ResultsPage() {
             <div className="text-[15px] font-bold text-navy mb-4">⭐ Note agence</div>
             <div className="flex flex-col gap-2.5 text-sm text-greyDark">
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> ★★★★★ (5 étoiles)
+                <input type="checkbox" className="accent-green" checked={filter5star} onChange={(e) => setFilter5star(e.target.checked)} /> ★★★★★ (5 étoiles)
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> ★★★★+ (4+)
+                <input type="checkbox" className="accent-green" checked={filter4plus} onChange={(e) => setFilter4plus(e.target.checked)} /> ★★★★+ (4+)
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> ★★★+ (3+)
+                <input type="checkbox" className="accent-green" checked={filter3plus} onChange={(e) => setFilter3plus(e.target.checked)} /> ★★★+ (3+)
               </label>
             </div>
           </div>
@@ -199,13 +241,13 @@ export default function ResultsPage() {
             <div className="text-[15px] font-bold text-navy mb-4">🚌 Équipements</div>
             <div className="flex flex-col gap-2.5 text-sm text-greyDark">
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> Climatisation
+                <input type="checkbox" className="accent-green" checked={filterAc} onChange={(e) => setFilterAc(e.target.checked)} /> Climatisation
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> Bagages inclus
+                <input type="checkbox" className="accent-green" checked={filterLuggage} onChange={(e) => setFilterLuggage(e.target.checked)} /> Bagages inclus
               </label>
               <label className="flex items-center gap-2.5">
-                <input type="checkbox" className="accent-green" /> USB / Chargeur
+                <input type="checkbox" className="accent-green" checked={filterUsb} onChange={(e) => setFilterUsb(e.target.checked)} /> USB / Chargeur
               </label>
             </div>
           </div>
@@ -214,22 +256,26 @@ export default function ResultsPage() {
         <div>
           <div className="flex items-center justify-between mb-5">
             <div className="text-base font-semibold text-navy">
-              {searchResults.length} trajets disponibles
+              {sorted.length} trajets disponibles
             </div>
-            <select className="border-[1.5px] border-greyLight rounded-sm2 px-4 py-2 text-sm text-greyDark bg-white cursor-pointer">
-              <option>Trier : Heure de départ</option>
-              <option>Prix croissant</option>
-              <option>Prix décroissant</option>
-              <option>Meilleure note</option>
+            <select
+              className="border-[1.5px] border-greyLight rounded-sm2 px-4 py-2 text-sm text-greyDark bg-white cursor-pointer"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="time">Trier : Heure de départ</option>
+              <option value="price-asc">Prix croissant</option>
+              <option value="price-desc">Prix décroissant</option>
+              <option value="rating">Meilleure note</option>
             </select>
           </div>
           <div>
             {searchLoading ? (
               <div className="text-center py-10 text-sm text-greyMid">Recherche en cours...</div>
-            ) : searchResults.length === 0 ? (
+            ) : sorted.length === 0 ? (
               <div className="text-center py-10 text-sm text-greyMid">Aucun trajet trouvé pour cette route.</div>
             ) : (
-              searchResults.map((t) => (
+              sorted.map((t) => (
                 <TripCard key={t.id} trip={t} />
               ))
             )}

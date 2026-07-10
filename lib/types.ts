@@ -31,6 +31,11 @@ export type PageKey =
   | "payment"
   | "confirm"
   | "agency"
+  | "agency-reservations"
+  | "agency-qr"
+  | "agency-stats"
+  | "agency-profile"
+  | "agency-subscription"
   | "agency-login"
   | "seed";
 

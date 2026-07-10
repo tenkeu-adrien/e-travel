@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, User, Loader2 } from "lucide-react";
+import { X, User, Loader2, Eye, EyeOff } from "lucide-react";
 import { useApp } from "@/lib/AppContext";
 import { signInWithPhone, signUpWithPhone } from "@/lib/firebase/auth";
 import { createTraveler } from "@/lib/firebase/firestore";
@@ -9,6 +9,7 @@ import { createTraveler } from "@/lib/firebase/firestore";
 export default function LoginModal() {
   const { loginModalOpen, setLoginModalOpen, showToast, firebaseReady } = useApp();
   const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const phoneRef = useRef<HTMLInputElement>(null);
   const passRef = useRef<HTMLInputElement>(null);
 
@@ -91,12 +92,22 @@ export default function LoginModal() {
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="form-label">Mot de passe</label>
-            <input
-              ref={passRef}
-              type="password"
-              className="form-input"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                ref={passRef}
+                type={showPass ? "text" : "password"}
+                className="form-input pr-10"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-greyMid hover:text-navy"
+                onClick={() => setShowPass(!showPass)}
+                tabIndex={-1}
+              >
+                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
         </div>
         <div className="px-7 py-4 border-t border-greyLight flex gap-3 justify-end">

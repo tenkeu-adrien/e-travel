@@ -335,31 +335,80 @@ export async function seedFirebase() {
     }
   }
 
-  await batch.commit();
-  console.log("  ✅ Reviews ajoutées");
+  // 4. CITIES
+  const CITIES_DATA = ["Douala", "Yaoundé", "Bafoussam", "Kribi", "Bamenda", "Garoua", "Maroua", "Ngaoundéré", "Bertoua", "Ebolowa"];
+  for (const name of CITIES_DATA) {
+    const ref = doc(Collections.cities(), name.toLowerCase());
+    batch.set(ref, { name });
+  }
+  console.log("  ✅ Villes ajoutées");
 
-  // 4. COMPTES UTILISATEURS (Firebase Auth)
+  // 5. APP SETTINGS
+  const appSettingsRef = doc(Collections.appSettings(), "supportPhone");
+  batch.set(appSettingsRef, { value: "+237 699 000 000" });
+
+  await batch.commit();
+  console.log("  ✅ Reviews + Cities + Settings ajoutées");
+
+  // 6. COMPTES UTILISATEURS (Firebase Auth)
+  let authOk = 0;
+  let authErrors = 0;
   for (const acc of TEST_ACCOUNTS) {
     try {
       if (auth) {
         await createUserWithEmailAndPassword(auth, acc.email, acc.password);
         console.log(`  ✅ Compte créé: ${acc.email}`);
+        authOk++;
       }
     } catch (err: any) {
       if (err.code === "auth/email-already-in-use") {
         console.log(`  ⏭️  Compte déjà existant: ${acc.email}`);
+        authOk++;
+      } else if (err.code === "auth/configuration-not-found") {
+        console.log(`  ❌ ${acc.email}: Authentication Email/Mot de passe NON activée dans la console Firebase.`);
+        authErrors++;
       } else {
         console.log(`  ❌ Erreur ${acc.email}: ${err.code}`);
+        authErrors++;
+      }
+    }
+  }
+
+  // Création des voyageurs dans Firestore
+  for (const acc of TEST_ACCOUNTS) {
+    if (!acc.isAgency && acc.traveler && db) {
+      try {
+        const ref = doc(collection(db, "travelers"));
+        await setDoc(ref, {
+          phone: acc.traveler.phone,
+          nom: acc.traveler.nom,
+          prenom: acc.traveler.prenom,
+          email: acc.email,
+          createdAt: serverTimestamp(),
+        });
+        console.log(`  ✅ Voyageur Firestore: ${acc.traveler.prenom} ${acc.traveler.nom}`);
+      } catch (e) {
+        console.log(`  ⚠️ Erreur création voyageur ${acc.email}:`, e);
       }
     }
   }
 
   console.log("🌱 Seed terminé avec succès !");
   console.log("");
-  console.log("📋 Comptes de test :");
-  console.log("   Agence : generalexpress@etravel.cm / password123");
-  console.log("   Agence : bucavoyages@etravel.cm / password123");
-  console.log("   Agence : cerisexpress@etravel.cm / password123");
-  console.log("   Voyageur : 690000001 / traveler123 (téléphone)");
-  console.log("   Voyageur : 690000002 / traveler123 (téléphone)");
+  console.log("📋 Données créées :");
+  console.log(`   ${AGENCIES.length} agences`);
+  console.log(`   ${TRIPS_DATA.length} trajets`);
+  console.log(`   ${REVIEWS_DATA.length} avis`);
+  console.log(`   ${CITIES_DATA.length} villes`);
+  console.log(`   ${authOk}/${TEST_ACCOUNTS.length} comptes Auth créés/existants`);
+  if (authErrors > 0) console.log(`   ⚠️ ${authErrors} erreur(s) Auth (vérifie la console Firebase > Authentication > Sign-in method > activer Email/Mot de passe)`);
+  console.log("");
+  console.log("🔑 Comptes de test :");
+  console.log("   🏢 Agences :");
+  console.log("      generalexpress@etravel.cm / password123 (Général Express)");
+  console.log("      bucavoyages@etravel.cm / password123 (Buca Voyages)");
+  console.log("      cerisexpress@etravel.cm / password123 (Cerise Express)");
+  console.log("   👤 Voyageurs :");
+  console.log("      690000001 / traveler123 → Antony Kamga");
+  console.log("      690000002 / traveler123 → Paul Nkeng");
 }

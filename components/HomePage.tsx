@@ -15,7 +15,7 @@ import { useApp } from "@/lib/AppContext";
 import { fetchCities, fetchAgencies } from "@/lib/firebase/firestore";
 
 export default function HomePage() {
-  const { search, showToast, firebaseReady } = useApp();
+  const { search, showToast, firebaseReady, goTo } = useApp();
   const [depart, setDepart] = useState("");
   const [arrivee, setArrivee] = useState("");
   const [date, setDate] = useState("");
@@ -196,7 +196,7 @@ export default function HomePage() {
       </div>
 
       {/* HOW IT WORKS */}
-      <section className="py-16 px-6 max-w-[1100px] mx-auto">
+      <section id="how-it-works" className="py-16 px-6 max-w-[1100px] mx-auto">
         <div className="text-center mb-10">
           <div className="text-2xl md:text-[26px] font-bold text-navy mb-2">
             Comment ça marche ?
@@ -241,7 +241,7 @@ export default function HomePage() {
       </section>
 
       {/* PARTNERS */}
-      <section className="py-16 px-6 bg-white">
+      <section id="partners" className="py-16 px-6 bg-white">
         <div className="max-w-[1100px] mx-auto">
           <div className="text-center mb-8">
             <div className="text-2xl md:text-[26px] font-bold text-navy mb-2">
@@ -303,27 +303,51 @@ export default function HomePage() {
               Navigation
             </div>
             <ul className="flex flex-col gap-2.5">
-              {["Accueil", "Nos agences", "Comment ça marche", "Devenir partenaire"].map(
-                (l) => (
-                  <li key={l}>
-                    <a href="#" className="text-white/60 hover:text-green transition-colors">
-                      {l}
-                    </a>
-                  </li>
-                )
-              )}
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => { goTo("home"); window.scrollTo(0, 0); }}>
+                  Accueil
+                </button>
+              </li>
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => document.querySelector("#partners")?.scrollIntoView({ behavior: "smooth" })}>
+                  Nos agences
+                </button>
+              </li>
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => document.querySelector("#how-it-works")?.scrollIntoView({ behavior: "smooth" })}>
+                  Comment ça marche
+                </button>
+              </li>
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => showToast("📧 Devenir partenaire : partenaires@e-travel.cm")}>
+                  Devenir partenaire
+                </button>
+              </li>
             </ul>
           </div>
           <div>
             <div className="text-white font-bold text-[15px] mb-4">Support</div>
             <ul className="flex flex-col gap-2.5">
-              {["FAQ", "CGU", "Contact", "WhatsApp Support"].map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-white/60 hover:text-green transition-colors">
-                    {l}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => showToast("📖 FAQ : Consultez notre centre d'aide ou contactez-nous au +237 699 000 000")}>
+                  FAQ
+                </button>
+              </li>
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => showToast("📄 Conditions Générales d'Utilisation disponibles sur demande")}>
+                  CGU
+                </button>
+              </li>
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => showToast("📧 Contact : support@e-travel.cm | 📞 +237 699 000 000")}>
+                  Contact
+                </button>
+              </li>
+              <li>
+                <button className="text-white/60 hover:text-green transition-colors text-left" onClick={() => showToast("📲 Envoyez-nous un message WhatsApp au +237 699 000 000")}>
+                  WhatsApp Support
+                </button>
+              </li>
             </ul>
           </div>
         </div>
